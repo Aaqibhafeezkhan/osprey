@@ -112,6 +112,9 @@ export function shareRoutes(app: FastifyInstance, db: Database, env: Env) {
     await loadRecordingFor(id, request);
     const rows = await db.select().from(shareLinks).where(and(eq(shareLinks.recordingId, id), isNull(shareLinks.revokedAt))).orderBy(desc(shareLinks.createdAt));
     return { shares: rows.map((row) => {
+      // Decrypted only to show the owner their own link. An empty ciphertext is a
+      // link created before this was stored; it still works, we just cannot
+      // display it again.
       const token = row.tokenCt ? open({ secretCt: row.tokenCt, secretIv: row.tokenIv, secretTag: row.tokenTag }, key) : null;
       return publicShape(row, token);
     }) };
@@ -163,7 +166,9 @@ export function shareRoutes(app: FastifyInstance, db: Database, env: Env) {
     };
   });
 
-  app.post('/v1/shares/:token/unlock', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+  app.post('/v1/shares/:token/unlock',
+    // Tight: this is a password prompt open to the internet.
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { token } = z.object({ token: z.string().min(10).max(200) }).parse(request.params);
     const { password } = z.object({ password: z.string().min(1).max(200) }).parse(request.body);
     const rows = await db.select().from(shareLinks).where(eq(shareLinks.tokenHash, hashToken(token))).limit(1);
