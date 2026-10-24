@@ -19,8 +19,8 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # The processing tests run a real encoder rather than mocking one.
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # Hosted Ubuntu images include ffmpeg; verify it is available without a slow apt update.
+      - run: ffmpeg -version
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
